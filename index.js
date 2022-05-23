@@ -1,7 +1,7 @@
 const express = require('express')
 const cors = require('cors');
 const app = express()
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const port = process.env.PORT || 5000;
 
@@ -26,11 +26,41 @@ async function run() {
             const products = await cursor.toArray();
             res.send(products)
         })
-        // get all reviews
+        // get single Product(purchage)
+        app.get('/products/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const result = await ProductCollection.findOne(query)
+            res.send(result)
+        })
+        // get all reviews:-
         app.get('/reviews', async (req, res) => {
             const query = {}
             const cursor = ReviewCollection.find(query)
             const result = await cursor.toArray()
+            res.send(result)
+        })
+        // post  review:-
+        app.post('/reviews', async (req, res) => {
+            const newReviews = req.body
+            const result = await ReviewCollection.insertOne(newReviews)
+            res.send(result)
+        })
+        // update Purchage item
+        app.put('/products/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id)
+            const updateUser = req.body;
+            const filter = { _id: ObjectId(id) }
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    availableQuantity: updateUser.availableQuantity,
+                    QuantityDecrese: updateUser.QuantityDecrese
+                }
+            }
+            console.log(updateDoc);
+            const result = await ProductCollection.updateOne(filter, updateDoc, options)
             res.send(result)
         })
     }
