@@ -17,13 +17,21 @@ async function run() {
     try {
         await client.connect();
         const ProductCollection = client.db("agcoDatabase").collection("products");
+        const ReviewCollection = client.db("agcoDatabase").collection("reviews");
 
-        // get all service or data load:-
+        // get all Products or data load:-
         app.get('/products', async (req, res) => {
             const query = {};
             const cursor = ProductCollection.find(query);
             const products = await cursor.toArray();
             res.send(products)
+        })
+        // get all reviews
+        app.get('/reviews', async (req, res) => {
+            const query = {}
+            const cursor = ReviewCollection.find(query)
+            const result = await cursor.toArray()
+            res.send(result)
         })
     }
     finally {
