@@ -18,6 +18,7 @@ async function run() {
         await client.connect();
         const ProductCollection = client.db("agcoDatabase").collection("products");
         const ReviewCollection = client.db("agcoDatabase").collection("reviews");
+        const OrderCollection = client.db("agcoDatabase").collection("orders");
 
         // get all Products or data load:-
         app.get('/products', async (req, res) => {
@@ -26,7 +27,7 @@ async function run() {
             const products = await cursor.toArray();
             res.send(products)
         })
-        // get single Product(purchage)
+        // get single Product(purchage):-
         app.get('/products/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) }
@@ -46,7 +47,7 @@ async function run() {
             const result = await ReviewCollection.insertOne(newReviews)
             res.send(result)
         })
-        // update Purchage item
+        // update Purchage item:-
         app.put('/products/:id', async (req, res) => {
             const id = req.params.id;
             console.log(id)
@@ -55,7 +56,7 @@ async function run() {
             const options = { upsert: true };
             const updateDoc = {
                 $set: {
-                    availableQuantity: updateUser.availableQuantity,
+                    orderQuantity: updateUser.orderQuantity,
                     QuantityDecrese: updateUser.QuantityDecrese
                 }
             }
@@ -63,6 +64,20 @@ async function run() {
             const result = await ProductCollection.updateOne(filter, updateDoc, options)
             res.send(result)
         })
+        // order collection API:-
+        app.post('/orders', async (req, res) => {
+            const order = req.body
+            const result = await OrderCollection.insertOne(order)
+            res.send(result)
+        })
+        // get order item
+        app.get('/orders', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email };
+            const bookings = await OrderCollection.find(query).toArray();
+            res.send(bookings)
+        })
+
     }
     finally {
         // await client.close();
