@@ -19,6 +19,8 @@ async function run() {
         const ProductCollection = client.db("agcoDatabase").collection("products");
         const ReviewCollection = client.db("agcoDatabase").collection("reviews");
         const OrderCollection = client.db("agcoDatabase").collection("orders");
+        const userCollection = client.db("agcoDatabase").collection("users");
+
 
         // get all Products or data load:-
         app.get('/products', async (req, res) => {
@@ -26,6 +28,12 @@ async function run() {
             const cursor = ProductCollection.find(query);
             const products = await cursor.toArray();
             res.send(products)
+        })
+        // post database
+        app.post('/products', async (req, res) => {
+            const newService = req.body
+            const result = await ProductCollection.insertOne(newService)
+            res.send(result)
         })
         // get single Product(purchage):-
         app.get('/products/:id', async (req, res) => {
@@ -76,6 +84,41 @@ async function run() {
             const query = { email: email };
             const bookings = await OrderCollection.find(query).toArray();
             res.send(bookings)
+        })
+        // insert user (login/register) information
+        app.put('/user/:email', async (req, res) => {
+            const email = req.params.email
+            const user = req.body
+            const filter = { email: email };
+            const option = { upsert: true };
+            const updateDoc = {
+                $set: user,
+            }
+            const result = await userCollection.updateOne(filter, updateDoc, option)
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET)
+            res.send({ result, token })
+        })
+        // get all users:-
+        app.get('/user', async (req, res) => {
+            const users = await userCollection.find().toArray();
+            res.send(users);
+        });
+        // Make Admin:-
+        app.put('/user/admin/:email', async (req, res) => {
+            const email = req.params.email
+            const filter = { email: email };
+            const updateDoc = {
+                $set: { role: 'admin' },
+            }
+            const result = await userCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+        // secure admin(if admin he makes a admin):-
+        app.get('/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = await userCollection.findOne({ email: email });
+            const isAdmin = user.role === 'admin';
+            res.send({ admin: isAdmin })
         })
 
     }
