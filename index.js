@@ -64,22 +64,22 @@ async function run() {
             res.send(result)
         })
         // update Purchage item:-
-        app.put('/products/:id', async (req, res) => {
-            const id = req.params.id;
-            console.log(id)
-            const updateUser = req.body;
-            const filter = { _id: ObjectId(id) }
-            const options = { upsert: true };
-            const updateDoc = {
-                $set: {
-                    orderQuantity: updateUser.orderQuantity,
-                    QuantityDecrese: updateUser.QuantityDecrese
-                }
-            }
-            console.log(updateDoc);
-            const result = await ProductCollection.updateOne(filter, updateDoc, options)
-            res.send(result)
-        })
+        // app.put('/products/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     console.log(id)
+        //     const updateUser = req.body;
+        //     const filter = { _id: ObjectId(id) }
+        //     const options = { upsert: true };
+        //     const updateDoc = {
+        //         $set: {
+        //             orderQuantity: updateUser.orderQuantity,
+        //             QuantityDecrese: updateUser.QuantityDecrese
+        //         }
+        //     }
+        //     console.log(updateDoc);
+        //     const result = await ProductCollection.updateOne(filter, updateDoc, options)
+        //     res.send(result)
+        // })
         // order collection API:-
         app.post('/orders', async (req, res) => {
             const order = req.body
