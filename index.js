@@ -20,6 +20,7 @@ async function run() {
         const ReviewCollection = client.db("agcoDatabase").collection("reviews");
         const OrderCollection = client.db("agcoDatabase").collection("orders");
         const userCollection = client.db("agcoDatabase").collection("users");
+        const profileCollection = client.db("agcoDatabase").collection("profile");
 
 
         // get all Products or data load:-
@@ -120,23 +121,29 @@ async function run() {
             res.send(users);
         });
         // Make Admin:-
-        // app.put('/user/admin/:email', async (req, res) => {
-        //     const email = req.params.email
-        //     const filter = { email: email };
-        //     const updateDoc = {
-        //         $set: { role: 'admin' },
-        //     }
-        //     const result = await userCollection.updateOne(filter, updateDoc)
-        //     res.send(result)
-        // })
+        app.put('/user/admin/:email', async (req, res) => {
+            const email = req.params.email
+            console.log(email);
+            const filter = { email: email };
+            const updateDoc = {
+                $set: { role: 'admin' },
+            }
+            const result = await userCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
         // secure admin(if admin he makes a admin):-
-        // app.get('/admin/:email', async (req, res) => {
-        //     const email = req.params.email;
-        //     const user = await userCollection.findOne({ email: email });
-        //     const isAdmin = user.role === 'admin';
-        //     res.send({ admin: isAdmin })
-        // })
-
+        app.get('/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = await userCollection.findOne({ email: email });
+            const isAdmin = user.role === 'admin';
+            res.send({ admin: isAdmin })
+        })
+        // update profile post database
+        app.post('/updateProfile', async (req, res) => {
+            const order = req.body
+            const result = await profileCollection.insertOne(order)
+            res.send(result)
+        })
     }
     finally {
         // await client.close();
