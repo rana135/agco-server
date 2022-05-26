@@ -102,7 +102,7 @@ async function run() {
             const result = await OrderCollection.deleteOne(query)
             res.send(result)
         })
-        // insert user (login/register) information
+        // insert user (login/register) information:-
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email
             const user = req.body
@@ -138,7 +138,7 @@ async function run() {
             const isAdmin = user?.role === 'admin';
             res.send({ admin: isAdmin })
         })
-        // update profile post database
+        // update profile post database:-
         app.post('/updateProfile', async (req, res) => {
             const order = req.body
             const result = await profileCollection.insertOne(order)
