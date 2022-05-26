@@ -86,14 +86,14 @@ async function run() {
             const result = await OrderCollection.insertOne(order)
             res.send(result)
         })
-        // get order item
+        // get order item:-
         app.get('/orders', async (req, res) => {
             const email = req.query.email;
             const query = { email: email };
             const bookings = await OrderCollection.find(query).toArray();
             res.send(bookings)
         })
-        // delete order item
+        // delete order item:-
         app.delete('/orders/:id', async (req, res) => {
             const id = req.params.id
             console.log(id)
@@ -120,7 +120,7 @@ async function run() {
             const users = await userCollection.find().toArray();
             res.send(users);
         });
-        // Make Admin:-
+        // Making Admin:-
         app.put('/user/admin/:email', async (req, res) => {
             const email = req.params.email
             console.log(email);
