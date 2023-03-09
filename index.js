@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors');
+var jwt = require('jsonwebtoken');
 const app = express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
@@ -12,6 +13,23 @@ app.use(express.json())
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.to6z5.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+
+function verifyJWT(req, res, next) {
+    const authHeader = req.headers.authorization;
+    // console.log("Beared with token:- ", authHeader);
+    if (!authHeader) {
+        res.status(401).send({ message: 'UnAuthorized access' });
+    }
+    const token = authHeader.split(" ")[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+        if (err) {
+            res.status(403).send({ message: 'Forbidden access' });
+        }
+        req.decoded = decoded;
+        next();
+    });
+}
 
 async function run() {
     try {
@@ -87,11 +105,17 @@ async function run() {
             res.send(result)
         })
         // get order item:-
-        app.get('/orders', async (req, res) => {
-            const email = req.query.email;
-            const query = { email: email };
-            const bookings = await OrderCollection.find(query).toArray();
-            res.send(bookings)
+        app.get('/orders', verifyJWT, async (req, res) => {
+            const decodedEmail = req?.decoded?.email;
+            const email = req?.query?.email;
+            if (email == decodedEmail) {
+                const query = { email: email };
+                const bookings = await OrderCollection.find(query).toArray();
+                res.send(bookings);
+            }
+            else {
+                return res.status(403).send({ message: "forbiden access" })
+            }
         })
         // delete order item:-
         app.delete('/orders/:id', async (req, res) => {
@@ -112,8 +136,8 @@ async function run() {
                 $set: user,
             }
             const result = await userCollection.updateOne(filter, updateDoc, option)
-            const token = process.env.ACCESS_TOKEN_SECRET
-            res.send({ result, token })
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET);
+            res.send({ result, token: token });
         })
         // get all users:-
         app.get('/user', async (req, res) => {
@@ -121,32 +145,57 @@ async function run() {
             res.send(users);
         });
         // Making Admin:-
-        app.put('/user/admin/:email', async (req, res) => {
-            const email = req.params.email
-            console.log(email);
-            const filter = { email: email };
-            const updateDoc = {
-                $set: { role: 'admin' },
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({ email: requester });
+            if (requesterAccount.role === "admin") {
+                const filter = { email: email };
+                const updateDoc = {
+                    $set: { role: 'admin' },
+                }
+                const result = await userCollection.updateOne(filter, updateDoc)
+                res.send(result)
             }
-            const result = await userCollection.updateOne(filter, updateDoc)
-            res.send(result)
+            else {
+                return res.status(403).send({ message: "forbiden access" })
+            }
         })
-        // secure admin(if admin he makes a admin):-
+        // check user role in database:-
         app.get('/admin/:email', async (req, res) => {
             const email = req.params.email;
             const user = await userCollection.findOne({ email: email });
             const isAdmin = user?.role === 'admin';
-            res.send({ admin: isAdmin })
+            res.send({ admin: isAdmin });
         })
         // update profile post database:-
-        app.post('/updateProfile', async (req, res) => {
-            const order = req.body
-            const result = await profileCollection.insertOne(order)
+        app.put('/updateProfile/:email', verifyJWT, async (req, res) => {
+            const email = req?.params.email;
+            const profile = req.body;
+            const filter = { email: email };
+            const option = { upsert: true };
+            const updateDoc = {
+                $set: profile,
+            }
+            const result = await profileCollection.updateOne(filter, updateDoc, option)
             res.send(result)
         })
-        app.delete("/deleteUser/:id", async(req, res)=>{
-            const id = req.params.id
-            const query = {_id:ObjectId(id)}
+        // get email base profile:-
+        app.get('/profile',verifyJWT, async (req, res) => {
+            const decodedEmail = req?.decoded?.email;
+            const email = req?.query?.email;
+            if (email == decodedEmail) {
+                const query = { email: email };
+                const profile = await profileCollection.find(query).toArray();
+                res.send(profile);
+            }
+            else {
+                return res.status(403).send({ message: "forbiden access" })
+            }
+        });
+        app.delete("/deleteUser/:id", async (req, res) => {
+            const id = req?.params.id
+            const query = { _id: ObjectId(id) }
             const result = await userCollection.deleteOne(query)
             res.send(result)
         })
