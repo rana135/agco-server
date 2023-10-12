@@ -5,6 +5,8 @@ const app = express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 
 // middleWare:-
 app.use(cors())
@@ -39,6 +41,7 @@ async function run() {
         const OrderCollection = client.db("agcoDatabase").collection("orders");
         const userCollection = client.db("agcoDatabase").collection("users");
         const profileCollection = client.db("agcoDatabase").collection("profile");
+        const paymentCollection = client.db("agcoDatabase").collection("payments");
 
 
         // get all Products or data load:-
@@ -81,24 +84,6 @@ async function run() {
             const result = await ReviewCollection.insertOne(newReviews)
             res.send(result)
         })
-        // update Purchage item:-
-        // app.put('/products/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     console.log(id)
-        //     const updateUser = req.body;
-        //     const filter = { _id: ObjectId(id) }
-        //     const options = { upsert: true };
-        //     const updateDoc = {
-        //         $set: {
-        //             orderQuantity: updateUser.orderQuantity,
-        //             QuantityDecrese: updateUser.QuantityDecrese
-        //         }
-        //     }
-        //     console.log(updateDoc);
-        //     const result = await ProductCollection.updateOne(filter, updateDoc, options)
-        //     res.send(result)
-        // })
-        // order collection API:-
         app.post('/orders', async (req, res) => {
             const order = req.body
             const result = await OrderCollection.insertOne(order)
@@ -117,14 +102,34 @@ async function run() {
                 return res.status(403).send({ message: "forbiden access" })
             }
         })
+        // get single Order for payment:-
+        app.get('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const order = await OrderCollection.findOne(query);
+            res.send(order);
+        })
         // delete order item:-
         app.delete('/orders/:id', async (req, res) => {
             const id = req.params.id
-            console.log(id)
             const query = { _id: ObjectId(id) }
-            console.log(query)
             const result = await OrderCollection.deleteOne(query)
             res.send(result)
+        })
+        // 
+        app.patch('/orders/:id', verifyJWT, async (req, res) => {
+            const id = req?.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updateDoc = {
+                $set: {
+                    paid:true,
+                    transactionId:payment.transactionId,
+                }
+            }
+            const updatedOrder = await OrderCollection.updateOne(filter, updateDoc);
+            const result = await paymentCollection.insertOne(payment);
+            res.send(updateDoc);
         })
         // insert user (login/register) information:-
         app.put('/user/:email', async (req, res) => {
@@ -161,8 +166,8 @@ async function run() {
                 return res.status(403).send({ message: "forbiden access" })
             }
         })
-        // check user role in database:-
-        app.get('/admin/:email',verifyJWT, async (req, res) => {
+        // check user role in database/given power as Admin:-
+        app.get('/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const user = await userCollection.findOne({ email: email });
             const isAdmin = user?.role === 'admin';
@@ -181,7 +186,7 @@ async function run() {
             res.send(result)
         })
         // get email base profile:-
-        app.get('/profile',verifyJWT, async (req, res) => {
+        app.get('/profile', verifyJWT, async (req, res) => {
             const decodedEmail = req?.decoded?.email;
             const email = req?.query?.email;
             if (email == decodedEmail) {
@@ -199,6 +204,24 @@ async function run() {
             const result = await userCollection.deleteOne(query)
             res.send(result)
         })
+
+        // Payment:-
+        app.post("/create-payment-intent",verifyJWT, async (req, res) => {
+            const service = req.body;
+            const price = service.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_method_types: [
+                    "card"
+                ],
+            });
+
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
     }
     finally {
         // await client.close();
