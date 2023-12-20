@@ -13,8 +13,15 @@ app.use(cors())
 app.use(express.json())
 
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.to6z5.mongodb.net/?retryWrites=true&w=majority`;
-const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rtycqvb.mongodb.net/?retryWrites=true&w=majority`;
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
+});
+
 
 
 function verifyJWT(req, res, next) {
@@ -36,12 +43,11 @@ function verifyJWT(req, res, next) {
 async function run() {
     try {
         client.connect();
-        const ProductCollection = client.db("agcoDatabase").collection("products");
-        const ReviewCollection = client.db("agcoDatabase").collection("reviews");
-        const OrderCollection = client.db("agcoDatabase").collection("orders");
-        const userCollection = client.db("agcoDatabase").collection("users");
-        const profileCollection = client.db("agcoDatabase").collection("profile");
-        const paymentCollection = client.db("agcoDatabase").collection("payments");
+        const ProductCollection = client.db("ecommerceDatabase").collection("products");
+        const OrderCollection = client.db("ecommerceDatabase").collection("orders");
+        const CardCollection = client.db("ecommerceDatabase").collection("cart");
+
+        const paymentCollection = client.db("ecommerceDatabase").collection("payments");
 
 
         // get all Products or data load:-
@@ -51,19 +57,6 @@ async function run() {
             const products = await cursor.toArray();
             res.send(products)
         })
-        // delete products
-        app.delete('/products/:id', async (req, res) => {
-            const id = req.params.id
-            const query = { _id: ObjectId(id) }
-            const result = await ProductCollection.deleteOne(query)
-            res.send(result)
-        })
-        // post database
-        app.post('/products', async (req, res) => {
-            const newService = req.body
-            const result = await ProductCollection.insertOne(newService)
-            res.send(result)
-        })
         // get single Product(purchage):-
         app.get('/products/:id', async (req, res) => {
             const id = req.params.id;
@@ -71,145 +64,98 @@ async function run() {
             const result = await ProductCollection.findOne(query)
             res.send(result)
         })
-        // get all reviews:-
-        app.get('/reviews', async (req, res) => {
-            const query = {}
-            const cursor = ReviewCollection.find(query)
-            const result = await cursor.toArray()
-            res.send(result)
-        })
-        // post  review:-
-        app.post('/reviews', async (req, res) => {
-            const newReviews = req.body
-            const result = await ReviewCollection.insertOne(newReviews)
-            res.send(result)
-        })
-        app.post('/orders', async (req, res) => {
-            const order = req.body
-            const result = await OrderCollection.insertOne(order)
-            res.send(result)
-        })
-        // get order item:-
-        app.get('/orders', verifyJWT, async (req, res) => {
-            const decodedEmail = req?.decoded?.email;
-            const email = req?.query?.email;
-            if (email == decodedEmail) {
-                const query = { email: email };
-                const bookings = await OrderCollection.find(query).toArray();
-                res.send(bookings);
-            }
-            else {
-                return res.status(403).send({ message: "forbiden access" })
-            }
-        })
-        // get single Order for payment:-
-        app.get('/order/:id', verifyJWT, async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const order = await OrderCollection.findOne(query);
-            res.send(order);
-        })
-        // delete order item:-
-        app.delete('/orders/:id', async (req, res) => {
-            const id = req.params.id
-            const query = { _id: ObjectId(id) }
-            const result = await OrderCollection.deleteOne(query)
-            res.send(result)
-        })
-        // 
-        app.patch('/orders/:id', verifyJWT, async (req, res) => {
-            const id = req?.params.id;
-            const payment = req.body;
-            const filter = { _id: ObjectId(id) };
-            const updateDoc = {
-                $set: {
-                    paid:true,
-                    transactionId:payment.transactionId,
-                }
-            }
-            const updatedOrder = await OrderCollection.updateOne(filter, updateDoc);
-            const result = await paymentCollection.insertOne(payment);
-            res.send(updateDoc);
-        })
-        // insert user (login/register) information:-
-        app.put('/user/:email', async (req, res) => {
-            const email = req.params.email
-            const user = req.body
-            const filter = { email: email };
-            const option = { upsert: true };
-            const updateDoc = {
-                $set: user,
-            }
-            const result = await userCollection.updateOne(filter, updateDoc, option)
-            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET);
-            res.send({ result, token: token });
-        })
-        // get all users:-
-        app.get('/user', async (req, res) => {
-            const users = await userCollection.find().toArray();
-            res.send(users);
-        });
-        // Making Admin:-
-        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
-            const email = req.params.email;
-            const requester = req.decoded.email;
-            const requesterAccount = await userCollection.findOne({ email: requester });
-            if (requesterAccount.role === "admin") {
-                const filter = { email: email };
-                const updateDoc = {
-                    $set: { role: 'admin' },
-                }
-                const result = await userCollection.updateOne(filter, updateDoc)
-                res.send(result)
-            }
-            else {
-                return res.status(403).send({ message: "forbiden access" })
-            }
-        })
-        // check user role in database/given power as Admin:-
-        app.get('/admin/:email', verifyJWT, async (req, res) => {
-            const email = req.params.email;
-            const user = await userCollection.findOne({ email: email });
-            const isAdmin = user?.role === 'admin';
-            res.send({ admin: isAdmin });
-        })
-        // update profile post database:-
-        app.put('/updateProfile/:email', verifyJWT, async (req, res) => {
-            const email = req?.params.email;
-            const profile = req.body;
-            const filter = { email: email };
-            const option = { upsert: true };
-            const updateDoc = {
-                $set: profile,
-            }
-            const result = await profileCollection.updateOne(filter, updateDoc, option)
-            res.send(result)
-        })
-        // get email base profile:-
-        app.get('/profile', verifyJWT, async (req, res) => {
-            const decodedEmail = req?.decoded?.email;
-            const email = req?.query?.email;
-            if (email == decodedEmail) {
-                const query = { email: email };
-                const profile = await profileCollection.find(query).toArray();
-                res.send(profile);
-            }
-            else {
-                return res.status(403).send({ message: "forbiden access" })
-            }
-        });
-        app.delete("/deleteUser/:id", async (req, res) => {
-            const id = req?.params.id
-            const query = { _id: ObjectId(id) }
-            const result = await userCollection.deleteOne(query)
-            res.send(result)
+
+        // OrderItem:-
+        app.get('/allOrder', async (req, res) => {
+            const query = {};
+            const cursor = paymentCollection.find(query);
+            const orders = await cursor.toArray();
+            res.send(orders)
         })
 
+        // addtocart:-
+        // GET request to fetch cart items
+        app.get('/api/cart', async (req, res) => {
+            const email = req?.query?.email;
+            const query = { email: email };
+            const cartItems = await CardCollection.find(query).toArray();
+            res.send(cartItems);
+        })           
+
+        // POST request to add an item to the cart
+        app.post('/api/cart/add', async (req, res) => {
+            const product = req.body;
+
+            try {
+                const result = await CardCollection.insertOne(product);
+                res.status(201).json(result);
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // PUT request to update quantity of an existing cart item
+        app.put('/api/cart/update/:id', async (req, res) => {
+            const { id } = req.params;
+            console.log(id);
+            const { quantity, selectedColor, selectedSize } = req.body;
+
+            try {
+                const result = await CardCollection.updateOne(
+                    { _id: ObjectId(id) },
+                    {
+                        $set: {
+                            quantity,
+                            selectedColor,
+                            selectedSize,
+                        },
+                    },
+                    { upsert: true }
+                );
+                res.status(200).json({ message: 'Product quantity and details updated' });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // increase/decrease:
+        app.put('/cart/update/:id', async (req, res) => {
+            const { id } = req.params;
+            const { quantity } = req.body;
+
+            try {
+                const result = await CardCollection.updateOne(
+                    { _id: ObjectId(id) },
+                    {
+                        $set: {
+                            quantity
+                        },
+                    },
+                    { upsert: true }
+                );
+                res.status(200).json({ message: 'Quantity updated' });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        app.delete('/api/cart/remove/:id', async (req, res) => {
+            const productId = req.params.id;
+
+            try {
+                const result = await CardCollection.deleteOne({ _id: ObjectId(productId) });
+                res.status(200).json({ message: 'Item removed from cart' });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
         // Payment:-
-        app.post("/create-payment-intent",verifyJWT, async (req, res) => {
+        app.post("/create-payment-intent", async (req, res) => {
             const service = req.body;
-            const price = service.price;
+            const price = service.price === 0 ? 1 : service.price;
             const amount = price * 100;
+            console.log(amount);
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
                 currency: "usd",
@@ -222,6 +168,48 @@ async function run() {
                 clientSecret: paymentIntent.client_secret,
             });
         });
+
+        app.patch('/updatedCart', async (req, res) => {
+            try {
+                let payments = req.body;
+
+                // Ensure payments is an array even for a single payment
+                if (!Array.isArray(payments)) {
+                    payments = [payments];
+                }
+
+                console.log(payments);
+
+                const updateOperations = payments.map(async (payment) => {
+                    const filter = { _id: ObjectId(payment.payment) };
+                    const updateDoc = {
+                        $set: {
+                            paid: true,
+                            transactionId: payment.transactionId,
+                        }
+                    };
+                    await CardCollection.updateOne(filter, updateDoc);
+                });
+
+                await Promise.all(updateOperations);
+
+                const result = await paymentCollection.insertMany(payments);
+                res.status(200).json({ success: true, result });
+            } catch (error) {
+                console.error('Error updating carts:', error);
+                res.status(500).json({ success: false, error: 'Error updating carts' });
+            }
+        });
+        // Adding item to wishlist for a user
+        const addUserWishlistItem = async (userId, productId) => {
+            const user = await db.collection('users').findOne({ _id: userId });
+            if (user) {
+                await db.collection('users').updateOne(
+                    { _id: userId },
+                    { $addToSet: { wishlist: productId } }
+                );
+            }
+        };
     }
     finally {
         // await client.close();
@@ -231,9 +219,9 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('AGCO Server!')
+    res.send('Ecommerce Server!')
 })
 
 app.listen(port, () => {
-    console.log(`AGCO Server listening on port ${port}`)
+    console.log(`Ecommerce Server listening on port ${port}`)
 })
